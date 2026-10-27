@@ -5,6 +5,8 @@ import sympy as sp
 
 
 def run_symbolic_checks(check_type: str, expression: str) -> dict:
+    """Run supported symbolic mathematics checks with SymPy."""
+
     if check_type == "none" or not expression.strip():
         return {
             "supported": False,
@@ -31,7 +33,9 @@ def run_symbolic_checks(check_type: str, expression: str) -> dict:
                 sp.simplify(expr.subs(x, root))
                 for root in roots
             ]
-            ok = len(roots) == 2 and all(
+
+            # Accept repeated roots as well as two distinct roots.
+            ok = poly.degree() == 2 and all(
                 value == 0 for value in results
             )
 
@@ -40,7 +44,9 @@ def run_symbolic_checks(check_type: str, expression: str) -> dict:
                 "ok": bool(ok),
                 "expression": str(expr),
                 "roots": [str(root) for root in roots],
-                "substitution_results": [str(value) for value in results],
+                "substitution_results": [
+                    str(value) for value in results
+                ],
             }
 
         if check_type == "derivative":
@@ -69,7 +75,9 @@ def run_symbolic_checks(check_type: str, expression: str) -> dict:
         return {
             "supported": True,
             "ok": False,
-            "message": f"Check failed: {type(exc).__name__}: {exc}",
+            "message": (
+                f"Check failed: {type(exc).__name__}: {exc}"
+            ),
         }
 
 
@@ -77,33 +85,38 @@ def verify_quadratic_answer(
     expression: str,
     final_answer: str,
 ) -> dict:
-    """Compare clearly reported numerical roots with SymPy roots."""
+    """Compare clearly formatted reported roots with SymPy roots."""
 
-    check = run_symbolic_checks("quadratic_roots", expression)
+    check = run_symbolic_checks(
+        "quadratic_roots",
+        expression,
+    )
 
     if not check.get("supported") or check.get("ok") is not True:
         return {
             "supported": False,
             "ok": None,
             "status": "REVIEW",
-            "message": "Could not independently verify the quadratic expression.",
+            "message": (
+                "Could not independently verify the quadratic expression."
+            ),
         }
 
-    # Accept only simple integer, decimal, or fraction roots.
     number = r"-?\d+(?:\.\d+)?(?:/\d+)?"
 
-    # Supported formats:
-    # "x = 2 and x = 3"
-    # "roots: 2, 3"
-    # "roots are 2 and 3"
     patterns = [
         rf"x\s*=\s*({number})\s*(?:,|and|or)\s*x\s*=\s*({number})",
         rf"(?:roots|solutions)\s*(?:are|:|=)\s*({number})\s*(?:,|and|or)\s*({number})",
     ]
 
     reported = None
+
     for pattern in patterns:
-        match = re.search(pattern, final_answer, flags=re.IGNORECASE)
+        match = re.search(
+            pattern,
+            final_answer,
+            flags=re.IGNORECASE,
+        )
         if match:
             reported = list(match.groups())
             break
@@ -121,37 +134,32 @@ def verify_quadratic_answer(
         }
 
     try:
+        x = sp.Symbol("x")
+        poly = sp.Poly(sp.sympify(expression, locals={"x": x}), x)
+
+        # all_roots() preserves multiplicity, e.g. [2, 2].
+        expected_roots = poly.all_roots()
         reported_roots = [
             sp.sympify(value, rational=True)
             for value in reported
         ]
-        expected_roots = [
-            sp.sympify(value, rational=True)
-            for value in check["roots"]
-        ]
 
-        matches = len(reported_roots) == len(expected_roots) and all(
-            any(
-                sp.simplify(root - expected) == 0
-                for expected in expected_roots
+        matches = (
+            len(reported_roots) == len(expected_roots)
+            and all(
+                sp.simplify(a - b) == 0
+                for a, b in zip(
+                    sorted(reported_roots, key=sp.default_sort_key),
+                    sorted(expected_roots, key=sp.default_sort_key),
+                )
             )
-            for root in reported_roots
         )
-
-        # Also ensure the reported roots contain no duplicates
-        # when two distinct roots are expected.
-        if len(expected_roots) == 2 and sp.simplify(
-            expected_roots[0] - expected_roots[1]
-        ) != 0:
-            matches = matches and (
-                sp.simplify(reported_roots[0] - reported_roots[1]) != 0
-            )
 
         return {
             "supported": True,
             "ok": bool(matches),
             "status": "PASS" if matches else "FAIL",
-            "expected_roots": check["roots"],
+            "expected_roots": [str(root) for root in expected_roots],
             "reported_roots": [str(root) for root in reported_roots],
             "message": (
                 "Reported roots match the symbolic result."
@@ -166,5 +174,5 @@ def verify_quadratic_answer(
             "ok": False,
             "status": "FAIL",
             "expected_roots": check["roots"],
-            "message": "Could not parse the reported numerical roots.",
+            "message": "Could not parse or compare the reported roots.",
         }
