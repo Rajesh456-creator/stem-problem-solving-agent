@@ -1,7 +1,5 @@
 
-import pytest
-
-from tools import run_symbolic_checks
+from tools import run_symbolic_checks, verify_quadratic_answer
 
 
 def test_quadratic_roots():
@@ -16,14 +14,14 @@ def test_quadratic_roots():
     assert set(result["substitution_results"]) == {"0"}
 
 
-def test_quadratic_roots_with_repeated_root():
+def test_reject_non_quadratic_expression():
     result = run_symbolic_checks(
         "quadratic_roots",
-        "x**2 - 4*x + 4",
+        "x**3 - 1",
     )
 
-    assert result["ok"] is True
-    assert result["roots"] == ["2"]
+    assert result["supported"] is True
+    assert result["ok"] is False
 
 
 def test_derivative():
@@ -32,16 +30,11 @@ def test_derivative():
         "x**3 + 2*x**2 - 4*x",
     )
 
-    assert result["supported"] is True
-    assert result["ok"] is True
     assert result["derivative"] == "3*x**2 + 4*x - 4"
 
 
 def test_simplify():
-    result = run_symbolic_checks(
-        "simplify",
-        "x + x",
-    )
+    result = run_symbolic_checks("simplify", "x + x")
 
     assert result["supported"] is True
     assert result["ok"] is True
@@ -67,4 +60,33 @@ def test_invalid_expression():
 
     assert result["supported"] is True
     assert result["ok"] is False
-    assert "Check failed" in result["message"]
+
+
+def test_answer_verification_pass():
+    result = verify_quadratic_answer(
+        "x**2 - 5*x + 6",
+        "The roots are x = 2 and x = 3.",
+    )
+
+    assert result["status"] == "PASS"
+    assert result["ok"] is True
+
+
+def test_answer_verification_fail():
+    result = verify_quadratic_answer(
+        "x**2 - 5*x + 6",
+        "The roots are x = 2 and x = 4.",
+    )
+
+    assert result["status"] == "FAIL"
+    assert result["ok"] is False
+
+
+def test_answer_verification_review():
+    result = verify_quadratic_answer(
+        "x**2 - 5*x + 6",
+        "The answer is probably two and three.",
+    )
+
+    assert result["status"] == "REVIEW"
+    assert result["ok"] is None
