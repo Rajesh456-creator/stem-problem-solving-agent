@@ -1,5 +1,13 @@
 # STEM Problem-Solving AI Agent — Cloud-friendly version
 
+## Live Demo
+
+Try the deployed Streamlit application here:
+
+**[Open STEM Problem-Solving AI Agent](https://stem-problem-solving-agent-zpeoqrvjw3qxenvnnqkfpq.streamlit.app)**
+
+**Note:** The application requires access to a supported Hugging Face inference model. Availability depends on the account's provider access and remaining credits.
+
 A beginner-friendly portfolio prototype with a Streamlit web UI, a hosted Hugging Face inference endpoint, Pydantic structured-output validation, and SymPy checks for selected symbolic mathematics.
 
 ## What it demonstrates
